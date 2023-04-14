@@ -5,8 +5,8 @@ var sql = require("mssql");
 
 // config for your database
 var config = {
-  user: "ad0rfin",
-  password: "chdefa432125e",
+  user: "sa",
+  password: "123",
   server: "localhost",
   database: "todolist",
   trustServerCertificate: true,
