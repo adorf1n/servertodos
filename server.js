@@ -17,11 +17,7 @@ var config = {
 app.use(express.static("public"));
 app.use(bodyParser.json());
 
-app.post("/api/login", async (req, res) => {
-  const { Login, Password } = req.body;
-});
-
-app.post("/api/users", async (req, res) => {
+app.post("/api/users/signup", async (req, res) => {
   const { Login, Password } = req.body;
   const pool = await sql.connect(config);
   let connection = new sql.ConnectionPool(config, function (err) {
@@ -35,7 +31,50 @@ app.post("/api/users", async (req, res) => {
         .then((result) => {
           res
             .status(200)
-            .json({ success: true, message: "Data added successfully" });
+            .json({ id: result.recordset.Id, login: result.recordset.Login });
+        })
+        .catch((error) => {
+          console.error(error);
+          res
+            .status(500)
+            .json({ success: false, message: "Error adding data" });
+        })
+        .finally(() => {
+          connection.close();
+        });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ success: false, message: "Error adding data" });
+    }
+  });
+});
+
+app.post("/api/users/signin", async (req, res) => {
+  const { Login, Password } = req.body;
+  const pool = await sql.connect(config);
+  let connection = new sql.ConnectionPool(config, function (err) {
+    let request = new sql.Request(connection);
+    try {
+      pool
+        .request()
+        .input("Login", sql.NVarChar, Login)
+        .input("Password", sql.NVarChar, Password)
+        .query(
+          `SELECT * FROM Users
+        WHERE Login = @Login`
+        )
+        .then((result) => {
+          console.log(result);
+          if (result.recordset[0].Password === Password) {
+            res.status(200).json({
+              Id: result.recordset[0].Id,
+              Login: result.recordset[0].Login,
+            });
+          } else {
+            res
+              .status(401)
+              .json({ success: false, message: "Password is not equal" });
+          }
         })
         .catch((error) => {
           console.error(error);
@@ -64,7 +103,6 @@ app.get("/api/users", function (req, res) {
 
       // send records as a response
       res.send(recordset.recordset);
-      console.log(recordset.recordset);
     });
   });
 });
