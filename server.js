@@ -107,7 +107,7 @@ app.get("/api/users", function (req, res) {
   });
 });
 
-app.post("/api/tasks", async (req, res) => {
+app.post("/api/tasks/add", async (req, res) => {
   const { UserId, title, completed, deleted } = req.body;
   const pool = await sql.connect(config);
   let connection = new sql.ConnectionPool(config, function (err) {
