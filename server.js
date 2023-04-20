@@ -3,6 +3,8 @@ var app = express();
 const cors = require("cors");
 const bodyParser = require("body-parser");
 var sql = require("mssql");
+const bcrypt = require("bcrypt");
+const saltRounds = 10;
 
 app.use(cors());
 // config for your database
@@ -19,6 +21,13 @@ app.use(bodyParser.json());
 
 app.post("/api/users/signup", async (req, res) => {
   const { Login, Password } = req.body;
+  const hashedPassword = await bcrypt
+    .hash(req.body.Password, saltRounds)
+    .then((hash) => {
+      return hash;
+    })
+    .catch((err) => console.error(err.message));
+
   const pool = await sql.connect(config);
   let connection = new sql.ConnectionPool(config, function (err) {
     let request = new sql.Request(connection);
@@ -26,12 +35,12 @@ app.post("/api/users/signup", async (req, res) => {
       pool
         .request()
         .input("Login", sql.NVarChar, Login)
-        .input("Password", sql.NVarChar, Password)
+        .input("Password", sql.NVarChar(sql.MAX), hashedPassword)
         .query("INSERT INTO Users (Login, Password) VALUES (@Login, @Password)")
         .then((result) => {
           res
             .status(200)
-            .json({ id: result.recordset.Id, login: result.recordset.Login });
+            .json({ success: true, message: "Data added succesfully" });
         })
         .catch((error) => {
           console.error(error);
@@ -64,8 +73,16 @@ app.post("/api/users/signin", async (req, res) => {
         WHERE Login = @Login`
         )
         .then((result) => {
-          console.log(result);
-          if (result.recordset[0].Password === Password) {
+          const checkPass = () => await;
+          bcrypt.compare(
+            Password,
+            result.recordset[0].Password,
+            function (err, result) {
+              return result;
+            }
+          );
+
+          if (checkPass) {
             res.status(200).json({
               Id: result.recordset[0].Id,
               Login: result.recordset[0].Login,
@@ -78,16 +95,14 @@ app.post("/api/users/signin", async (req, res) => {
         })
         .catch((error) => {
           console.error(error);
-          res
-            .status(500)
-            .json({ success: false, message: "Error adding data" });
+          res.status(500).json({ success: false, message: "Server problem" });
         })
         .finally(() => {
           connection.close();
         });
     } catch (error) {
       console.error(error);
-      res.status(500).json({ success: false, message: "Error adding data" });
+      res.status(500).json({ success: false, message: "Server problem (2)" });
     }
   });
 });
