@@ -129,7 +129,7 @@ app.get("/api/users", function (req, res) {
 
 //Добавить заметку
 app.post("/api/tasks/add", async (req, res) => {
-  const { UserId, title, completed, deleted } = req.body;
+  const { UserId, title } = req.body;
   const pool = await sql.connect(config);
   let connection = new sql.ConnectionPool(config, function (err) {
     let request = new sql.Request(connection);
@@ -138,11 +138,7 @@ app.post("/api/tasks/add", async (req, res) => {
         .request()
         .input("UserId", sql.Int, UserId)
         .input("title", sql.NVarChar, title)
-        .input("completed", sql.Bit, completed)
-        .input("deleted", sql.Bit, deleted)
-        .query(
-          "INSERT INTO TaskList (UserId, title, completed, deleted) VALUES (@UserId, @title, @completed, @deleted)"
-        )
+        .query("INSERT INTO TaskList (UserId, title) VALUES (@UserId, @title)")
         .then((result) => {
           res
             .status(200)
@@ -176,7 +172,6 @@ app.get("/api/tasks/:id", async (req, res) => {
         .input("UserId", sql.Int, UserId)
         .query(`Select * FROM TaskList where UserId = @UserId`)
         .then((result) => {
-          console.log(result.recordset);
           res.status(200).json({ tasks: result.recordset });
         })
         .catch((error) => {
