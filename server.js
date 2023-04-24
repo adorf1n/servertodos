@@ -7,7 +7,7 @@ const bcrypt = require("bcrypt");
 const saltRounds = 10;
 
 app.use(cors());
-// config for your database
+
 var config = {
   user: "ad0rfin",
   password: "chdefa432125e",
@@ -19,6 +19,7 @@ var config = {
 app.use(express.static("public"));
 app.use(bodyParser.json());
 
+//Регистрация пользователя
 app.post("/api/users/signup", async (req, res) => {
   const { Login, Password } = req.body;
   const hashedPassword = await bcrypt
@@ -58,8 +59,10 @@ app.post("/api/users/signup", async (req, res) => {
   });
 });
 
+//Авторизация пользователя
 app.post("/api/users/signin", async (req, res) => {
   const { Login, Password } = req.body;
+
   const pool = await sql.connect(config);
   let connection = new sql.ConnectionPool(config, function (err) {
     let request = new sql.Request(connection);
@@ -73,14 +76,14 @@ app.post("/api/users/signin", async (req, res) => {
         WHERE Login = @Login`
         )
         .then((result) => {
-          const checkPass = () => await;
-          bcrypt.compare(
-            Password,
-            result.recordset[0].Password,
-            function (err, result) {
-              return result;
-            }
-          );
+          const checkPass = async () =>
+            bcrypt.compare(
+              Password,
+              result.recordset[0].Password,
+              function (err, result) {
+                return result;
+              }
+            );
 
           if (checkPass) {
             res.status(200).json({
@@ -93,10 +96,12 @@ app.post("/api/users/signin", async (req, res) => {
               .json({ success: false, message: "Password is not equal" });
           }
         })
+
         .catch((error) => {
           console.error(error);
           res.status(500).json({ success: false, message: "Server problem" });
         })
+
         .finally(() => {
           connection.close();
         });
@@ -107,21 +112,22 @@ app.post("/api/users/signin", async (req, res) => {
   });
 });
 
+//Получить всех пользователей
 app.get("/api/users", function (req, res) {
-  // connect to your database
   sql.connect(config, function (err) {
     if (err) console.log(err);
+
     var request = new sql.Request();
-    // query to the database and get the records
+
     request.query("select * from Users", function (err, recordset) {
       if (err) console.log(err);
 
-      // send records as a response
       res.send(recordset.recordset);
     });
   });
 });
 
+//Добавить заметку
 app.post("/api/tasks/add", async (req, res) => {
   const { UserId, title, completed, deleted } = req.body;
   const pool = await sql.connect(config);
@@ -158,19 +164,32 @@ app.post("/api/tasks/add", async (req, res) => {
   });
 });
 
-app.get("/api/tasks", function (req, res) {
-  // connect to your database
-  sql.connect(config, function (err) {
-    if (err) console.log(err);
-    var request = new sql.Request();
-    // query to the database and get the records
-    request.query("select * from TaskList", function (err, recordset) {
-      if (err) console.log(err);
-
-      // send records as a response
-      res.send(recordset.recordset);
-      console.log(recordset.recordset);
-    });
+//Получить список всех заметок для текущего пользователя
+app.get("/api/tasks/:id", async (req, res) => {
+  const UserId = req.params.id;
+  const pool = await sql.connect(config);
+  let connection = new sql.ConnectionPool(config, function (err) {
+    let request = new sql.Request(connection);
+    try {
+      pool
+        .request()
+        .input("UserId", sql.Int, UserId)
+        .query(`Select * FROM TaskList where UserId = @UserId`)
+        .then((result) => {
+          console.log(result.recordset);
+          res.status(200).json({ tasks: result.recordset });
+        })
+        .catch((error) => {
+          console.error(error);
+          res.status(500).json({ success: false, message: "Error on server" });
+        })
+        .finally(() => {
+          connection.close();
+        });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ success: false, message: "Error on server" });
+    }
   });
 });
 
