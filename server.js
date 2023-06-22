@@ -22,106 +22,78 @@ app.use(express.static("public"));
 app.use(bodyParser.json());
 
 //Регистрация пользователя
-app.post("/api/users/signup", async (req, res) => {
-  const { Login, Password } = req.body;
-  const hashedPassword = await bcrypt
-    .hash(req.body.Password, saltRounds)
-    .then((hash) => {
-      return hash;
-    })
-    .catch((err) => console.error(err.message));
+app.get("/api/userlist", async (req, res) => {
+  try {
+    const pool = await sql.connect(config);
+    const request = pool.request();
+    const result = await request.query("SELECT * FROM Users");
+    res.status(200).json({ userlist: result.recordset });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: "Error on server" });
+  } finally {
+    sql.close();
+  }
+});
 
-  const pool = await sql.connect(config);
-  let connection = new sql.ConnectionPool(config, function (err) {
-    let request = new sql.Request(connection);
-    try {
-      pool
-        .request()
-        .input("Login", sql.NVarChar, Login)
-        .input("Password", sql.NVarChar(sql.MAX), hashedPassword)
-        .query("INSERT INTO Users (Login, Password) VALUES (@Login, @Password)")
-        .then((result) => {
-          res
-            .status(200)
-            .json({ success: true, message: "Data added succesfully" });
-        })
-        .catch((error) => {
-          console.error(error);
-          res
-            .status(500)
-            .json({ success: false, message: "Error adding data" });
-        })
-        .finally(() => {
-          connection.close();
-        });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ success: false, message: "Error adding data" });
-    }
-  });
+//Регистрация пользователя
+app.post('/api/users/signup', async (req, res) => {
+  try {
+    const { login, password } = req.body;
+
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+    const pool = await sql.connect(config);
+    const request = pool.request();
+    request.input('login', sql.NVarChar, login);
+    request.input('password', sql.NVarChar(sql.MAX), hashedPassword);
+
+    const result = await request.query('INSERT INTO Users (login, password) VALUES (@login, @password)');
+
+    res.status(200).json({ success: true, message: 'Data added successfully' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Error adding data' });
+  } finally {
+    sql.close();
+  }
 });
 
 //Авторизация пользователя
-app.post("/api/users/signin", async (req, res) => {
-  const { Login, Password } = req.body;
+app.post("/api/users/login", async (req, res) => {
+  try {
+    const { login, password } = req.body;
+    console.log(password);
 
-  const pool = await sql.connect(config);
-  let connection = new sql.ConnectionPool(config, function (err) {
-    let request = new sql.Request(connection);
-    try {
-      pool
-        .request()
-        .input("Login", sql.NVarChar, Login)
-        .input("Password", sql.NVarChar, Password)
-        .query(
-          `SELECT * FROM Users
-        WHERE Login = @Login`
-        )
-        .then(async(result) => {
-          const checkPass = await bcrypt.compareSync(Password, result.recordset[0].password);
+    const pool = await sql.connect(config);
+    const request = pool.request();
+    
+    const result = await request
+      .input("login", sql.NVarChar, login)
+      .query(
+        `SELECT * FROM Users
+        WHERE login = @login`
+      );
 
-
-          if (checkPass) {
-            res.status(200).json({
-              Id: result.recordset[0].Id,
-              Login: result.recordset[0].Login,
-            });
-          } else {
-            res
-              .status(401)
-              .json({ success: false, message: "Password is not equal" });
-          }
-        })
-
-        .catch((error) => {
-          console.error(error);
-          res.status(500).json({ success: false, message: "Server problem" });
-        })
-
-        .finally(() => {
-          connection.close();
+    if (result.recordset.length > 0) {
+      const checkPass = bcrypt.compareSync(password, result.recordset[0].password);
+      if (checkPass) {
+        res.status(200).json({
+          id: result.recordset[0].id,
+          login: result.recordset[0].login,
         });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ success: false, message: "Server problem (2)" });
+      } else {
+        res.status(401).json({ success: false, message: "Password is not equal" });
+      }
+    } else {
+      res.status(401).json({ success: false, message: "User not found" });
     }
-  });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: "Server problem" });
+  }
 });
 
-//Получить всех пользователей
-app.get("/api/users", function (req, res) {
-  sql.connect(config, function (err) {
-    if (err) console.log(err);
-
-    var request = new sql.Request();
-
-    request.query("select * from Users", function (err, recordset) {
-      if (err) console.log(err);
-
-      res.send(recordset.recordset);
-    });
-  });
-});
 
 //Добавить заметку
 app.post("/api/tasks/add", async (req, res) => {
