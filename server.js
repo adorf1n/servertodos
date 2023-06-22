@@ -1,5 +1,6 @@
 var express = require("express");
 var app = express();
+require("dotenv").config();
 const cors = require("cors");
 const bodyParser = require("body-parser");
 var sql = require("mssql");
@@ -9,12 +10,13 @@ const saltRounds = 10;
 app.use(cors());
 
 var config = {
-  user: "ad0rfin",
-  password: "chdefa432125e",
-  server: "localhost",
-  database: "todolist",
+  user: process.env.MSSQL_USER_LOGIN,
+  password: process.env.MSSQL_USER_PASSWORD,
+  server: process.env.MSSQL_SERVER_API,
+  database: process.env.MSSQL_DATABASE_NAME,
   trustServerCertificate: true,
 };
+
 
 app.use(express.static("public"));
 app.use(bodyParser.json());
@@ -75,15 +77,9 @@ app.post("/api/users/signin", async (req, res) => {
           `SELECT * FROM Users
         WHERE Login = @Login`
         )
-        .then((result) => {
-          const checkPass = async () =>
-            bcrypt.compare(
-              Password,
-              result.recordset[0].Password,
-              function (err, result) {
-                return result;
-              }
-            );
+        .then(async(result) => {
+          const checkPass = await bcrypt.compareSync(Password, result.recordset[0].password);
+
 
           if (checkPass) {
             res.status(200).json({
