@@ -60,7 +60,7 @@ app.post('/api/users/signup', async (req, res) => {
 });
 
 //Авторизация пользователя
-app.post("/api/users/login", async (req, res) => {
+app.post("/api/users/signin", async (req, res) => {
   try {
     const { login, password } = req.body;
     console.log(password);
